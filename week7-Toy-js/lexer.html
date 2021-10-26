@@ -1,0 +1,105 @@
+<pre>
+<script>
+    const myXregrexp = {
+      InputElement: "<Whitespace>|<LineTerminator>|<Comments>|<Token>",
+      Whitespace: / /,
+      LineTerminator: /\n/,
+      Comments: /\/\*(?:[^*]|\*[^\/])*\*\/|\/\/[^\n]*/,
+      Token: "<Literal>|<Keywords>|<Identifier>|<Punctuator>",
+      Literal: "<NumericalLiteral>|<BooleanLiteral>|<StringLiteral>|<NullLiteral>",
+      NumericalLiteral: /(?:[1-9][0-9]*|0)(?:\.[0-9]*)?|\.[0-9]+/,
+      BooleanLiteral: /true| false/,
+      StringLiteral: /\"(?:[^"\n]|\\[\s\S])*\"|\'(?:[^'\n]|\\[\s\S])*\'/,
+      NullLiteral: /null/,
+      Identifier: /[a-zA-Z_$][a-zA-Z0-9_$]*/,
+      Keywords: /if|else|for|function|let|var/,
+      Punctuator: /\+|\,|\?|\:|\{|\}|\.|\(|\=|\<|\+\+|\=\=|=>|=|\*|\)|\[|\]|;/
+    };
+
+    class XRegExp {
+      constructor(source, flag, root = "root") {
+        this.table = new Map();
+        this.regexp = new RegExp(this.compileRegExp(source, root, 0).source, flag);
+
+        //console.log("XRegExp -> constructor -> regexp", this.regexp);
+        //console.log("XRegExp -> constructor -> table", this.table);
+      }
+
+      compileRegExp(source, name, start) {
+        if (source[name] instanceof RegExp) {
+          //console.log(name, " =", source[name].source);
+          return { source: source[name].source, length: 0 };
+        } else {
+          // console.log(name, " =", source[name]);
+        }
+
+        let length = 0;
+        let regexp = source[name].replace(/\<([^>]+)\>/g, (str, $1) => {
+          this.table.set(start + length, $1);
+          // this.table.set($1, start+ length);
+          ++length;
+          let r = this.compileRegExp(source, $1, start + length);
+          length += r.length;
+          return "(" + r.source + ")";
+        });
+
+        return { source: regexp, length: length };
+      }
+      exec(string) {
+        let r = this.regexp.exec(string);
+        //console.log("-------\nXRegExp -> exec -> r[0]=", JSON.stringify(r[0]));
+        for (let i = 1; i < r.length; i++) {
+          if (r[i] !== void 0) {
+           // console.log(this.table.get(i - 1));
+            r[this.table.get(i - 1)] = r[i];
+          }
+        }
+
+        return r;
+      }
+
+      get lastIndex() {
+        return this.regexp.lastIndex;
+      }
+
+      set lastIndex(value) {
+        return (this.regexp.lastIndex = value);
+      }
+    }
+
+    function scan(str) {
+      let regexp = new XRegExp(myXregrexp, "g", "InputElement");
+      //console.log(regexp);
+
+      while (regexp.lastIndex < str.length) {
+      
+        let r = regexp.exec(str);
+       
+        console.log(r);
+         //document.write(r)
+        if (!r[0].length) {
+          break;
+        }
+      }
+
+        console.log("XRegExp -> regexp -> table", regexp.table);
+    }
+
+    const toScan = `
+      for(let i=0; i<3;i++){
+        for (let j=0; j<3; j++){
+          let cell = document.createElement("div");
+          cell.classList.add("cell");
+          cell.innerText= pattern[i*3 + j] == 2 ? "X":
+            pattern[i * 3 + j] == 1 ? "O" : "";
+            cell.addEventListener("click", () => userMove(j, i));
+            board.appendChild(cell);
+            a=4;
+        }
+        board.appendChild(document.createElement("br"))
+      }
+      `;
+    scan(toScan);
+
+</script>
+</pre>
