@@ -1,36 +1,48 @@
-import { CleanPlugin } from "webpack";
-
+const liner = require("./ease.js");
 const TICK = Symbol("tick");
 const TICK_HANDLER = Symbol("tick-handler");
 const ANIMATIONS = Symbol("animations");
 const START_TIME = Symbol("animation_start_time");
+const PAUSE_START = Symbol("pause_start");
+const PAUSE_TIME = Symbol("pause_time");
 
 export class Timeline {
   constructor() {
+    this.state = "Inited";
     this[ANIMATIONS] = new Set();
     this[START_TIME] = new Map();
   }
 
   start() {
+    if (this.state !== "Inited") {
+      return;
+    }
+    this.state = "Started";
     const startTime = Date.now();
-
+    this[PAUSE_TIME] = 0;
     this[TICK] = () => {
-      console.log("startTime=", startTime);
       let now = Date.now();
       let t;
       for (let animation of this[ANIMATIONS]) {
         //console.log("Timeline -> start -> animation", animation);
 
         if (this[START_TIME].get(animation) < startTime) {
-          t = now - startTime;
+          t = now - startTime - this[PAUSE_TIME] - animation.delay;
         } else {
-          t = now - this[START_TIME].get(animation);
+          t =
+            now -
+            this[START_TIME].get(animation) -
+            this[PAUSE_TIME] -
+            animation.delay;
         }
 
         if (t > animation.duration) {
           this[ANIMATIONS].delete(animation);
+          console.log("--deleted");
           t = animation.duration;
-        } else {
+        }
+
+        if (t > 0) {
           animation.receive(t);
         }
       }
@@ -41,13 +53,33 @@ export class Timeline {
   }
 
   pause() {
+    if (this.state !== "Started") {
+      return;
+    }
+    this.state = "Paused";
+    this[PAUSE_START] = Date.now();
     cancelAnimationFrame(this[TICK_HANDLER]);
   }
   resume() {
+    if (this.state !== "Paused") {
+      return;
+    }
+    this.state = "Started";
+    this[PAUSE_TIME] += Date.now() - this[PAUSE_START];
     this[TICK]();
   }
 
-  reset() {}
+  reset() {
+    this.pause();
+    this.state = "Inited";
+    let startTime = Date.now();
+    this[PAUSE_TIME] = 0;
+
+    this[ANIMATIONS] = new Set();
+    this[START_TIME] = new Map();
+    this[TICK_HANDLER] = null;
+    this[PAUSE_START] = 0;
+  }
 
   add(animation, startTime) {
     console.log("Timeline -> add -> animation", animation);
@@ -77,24 +109,21 @@ export class Animation {
     this.endValue = endValue;
     this.duration = duration;
     this.delay = delay;
-    this.timingFunction = timingFunction;
-    this.template = template;
+    this.timingFunction = timingFunction || (v => v);
+    this.template = template || (v => v);
+  }
+
+  getDurationWithDelay() {
+    return this.duration + this.delay;
   }
 
   receive(time) {
     let range = this.endValue - this.startValue;
-    console.log(
-      "this.property",
-      this.property,
-      " time=",
-      time,
-      "range=",
-      range,
-      " this.template=",
-      this.template
-    );
-    this.object[this.property] = this.template(
-      this.startValue + (range * time) / this.duration
-    );
+    let value = this.startValue + (range * time) / this.duration;
+
+    let progress = this.timingFunction
+      ? this.timingFunction(time / this.duration)
+      : null;
+    this.object[this.property] = this.template(value);
   }
 }
