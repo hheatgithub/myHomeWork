@@ -25,7 +25,7 @@ export function createElement(type, attributes, ...children) {
     }
   };
 
-  processChildren(childeren);
+  processChildren(children);
   return element;
 }
 
@@ -56,7 +56,7 @@ export class Component {
 
   triggerEvent(type, args) {
     this[ATTRIBUTE]["on" + type.replace(/^[\s\S]/, s => s.toUpperCase())](
-      new CustomEvent(type, args)
+      new CustomEvent(type, { detail: args })
     );
   }
 }
